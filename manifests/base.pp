@@ -1,5 +1,5 @@
 class dovecot-iauth::base {
-    require rubygems::active_support
+    require rubygems::activesupport
     require rubygems::postgres
     require rubygems::digest
 
