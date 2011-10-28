@@ -4,7 +4,12 @@ class dovecot-iauth::base {
     }
 
     include rubygems::bcrypt
-    
+   
+    file{ '/usr/libexec/dovecot/checkpassword-bcrypt' :
+      ensure => directory,
+      owner => root, group => root, mode => 0644;
+    }
+ 
     file{'/usr/libexec/dovecot/checkpassword-bcrypt/checkpassword-bcrypt.rb':
       source => "puppet:///modules/dovecot-iauth/checkpassword-bcrypt.rb",
       require => Package['dovecot'],
