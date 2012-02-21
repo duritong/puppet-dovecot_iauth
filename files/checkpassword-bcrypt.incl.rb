@@ -91,7 +91,7 @@ module CheckpasswordBCrypt
     def hash?(user, pass)
       if user[:hash_algo] == 'BCrypt'
       	result = BCrypt::Password.new(user[:hash_raw]) == pass
-	      warn "aborting: bcrypt hashes do not match: #{user[:name]}"
+	      warn "aborting: bcrypt hashes do not match: #{user[:name]}" unless result
         begin
           warn "multibyte chars: #{pass.unpack("U*").size != pass.size}" unless result
         rescue
