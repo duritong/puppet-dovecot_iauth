@@ -11,16 +11,23 @@ begin
   (username,pass) = input.read.unpack("Z*Z*")
   input.close
 rescue
+  warn "warning: could not read username/pass from stdin"
   exit AuthError
 end
 
 checker = CheckpasswordBCrypt::PasswordChecker.new
 
 user = checker.get_user(username)
-exit AuthError if user.nil? || user.empty?
+if user.nil? || user.empty?
+  warn "warning: auth error #{user.inspect}, could not fetch user"
+  exit AuthError
+end
 
 if( authorized != "1" )
-  exit AuthError unless checker.hash?(user, pass)
+  unless checker.hash?(user, pass)
+    warn "warning: auth error #{user.inspect}, pw check failed"
+    exit AuthError
+  end
   checker.login( user )
 end
 

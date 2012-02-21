@@ -35,7 +35,12 @@ module CheckpasswordBCrypt
         [0-9a-z.\-]+ # Domain name middle
         [0-9a-z] # Domain name end
         $}xi
-      email =~ email_regex
+      if email =~ email_regex
+        true
+      else
+        warn "not a 'valid' email address: #{email}"
+        false
+      end
     end
 
     def escape(string)
@@ -46,8 +51,16 @@ module CheckpasswordBCrypt
       return nil unless is_email( username )
       username = escape(username)
       sql = sprintf( Config::SQL::UserQuery, username )
-      res = @connection.exec(sql)
-      return nil if res[0].nil?
+      begin
+	res = @connection.exec(sql)
+      rescue PGError => e
+        warn "sql failed with: #{e} (#{sql})"
+        return nil
+      end
+      unless res[0]
+        warn "got empty result for user #{username}"
+        return nil
+      end
 
       parse_user( res[0] )
     end
@@ -76,7 +89,11 @@ module CheckpasswordBCrypt
     end
 
     def hash?(user, pass)
-      return BCrypt::Password.new(user[:hash_raw]) == pass if user[:hash_algo] == 'BCrypt'
+      if user[:hash_algo] == 'BCrypt'
+      	result = BCrypt::Password.new(user[:hash_raw]) == pass
+	warn "aborting: bcrypt hashes do not match: #{user[:name]} multibyte chars: #{pass.unpack("U*").size != pass.size}" unless result
+        return result
+      end
 
       unless Config::Migration
         warn "aborting: no bcrypt hash for user #{user[:name]} and migration disabled"
@@ -113,14 +130,22 @@ module CheckpasswordBCrypt
       sql = sprintf( Config::SQL::UserMigrate,
                      new_hash, user[:name])
 
-      @connection.exec(sql)
+      begin
+	@connection.exec(sql)
+      rescue PGError => e
+        warn "sql failed with: #{e} (#{sql})"
+      end
     end
 
     def login(user)
       current_time = Time.now.strftime('%Y%m')
       if Config::KeepLastLogin and user[:lastlogin] != current_time
         sql = sprintf( Config::SQL::UpdateLastLogin, current_time, user[:name] )
-        @connection.exec(sql)
+        begin
+  	  @connection.exec(sql)
+        rescue PGError => e
+          warn "sql failed with: #{e} (#{sql})"
+        end
       end
     end
   end
