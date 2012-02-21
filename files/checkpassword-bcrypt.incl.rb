@@ -91,7 +91,12 @@ module CheckpasswordBCrypt
     def hash?(user, pass)
       if user[:hash_algo] == 'BCrypt'
       	result = BCrypt::Password.new(user[:hash_raw]) == pass
-	warn "aborting: bcrypt hashes do not match: #{user[:name]} multibyte chars: #{pass.unpack("U*").size != pass.size}" unless result
+	      warn "aborting: bcrypt hashes do not match: #{user[:name]}"
+        begin
+          warn "multibyte chars: #{pass.unpack("U*").size != pass.size}" unless result
+        rescue
+          warn "pw has no valid encoding"
+        end
         return result
       end
 
