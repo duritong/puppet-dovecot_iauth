@@ -3,7 +3,7 @@
 require File.join(File.dirname(__FILE__), "checkpassword-bcrypt.incl.rb")
 
 #if authorized is set to 1, dovecot does a userdb lookup. no login required.
-authorized = ENV['AUTHORIZED']
+authorized = ENV['AUTHORIZED'].to_i
 dovecot = ARGV[0]
 
 begin
@@ -11,25 +11,31 @@ begin
   (username,pass) = input.read.unpack("Z*Z*")
   input.close
 rescue
-  warn "warning: could not read username/pass from stdin"
-  exit AuthError
+  warn "could not read username/pass from stdin, terminating"
+  exit InternalAuthError
 end
 
 checker = CheckpasswordBCrypt::PasswordChecker.new
 
-user = checker.get_user(username)
-if user.nil? || user.empty?
-  warn "warning: auth error #{user.inspect}, could not fetch user"
-  exit AuthError
-end
+begin
+  checker.prepare!
 
-if( authorized != "1" )
-  unless checker.hash?(user, pass)
-    warn "warning: auth error #{user.inspect}, pw check failed"
+  unless checker.user?(username)
     exit AuthError
   end
-  checker.login( user )
+
+  if authorized != 1
+    unless checker.pass?(pass)
+      exit AuthError
+    end
+  end
+rescue CheckpasswordBCrypt::InternalError
+  warn "authentication not possible, terminating..."
+  exit InternalAuthError
 end
+
+user = checker.user
+checker.login!
 
 new_env = "USER='#{user[:name]}' "+
           "HOME='#{user[:home]}#{user[:name]}' "+
