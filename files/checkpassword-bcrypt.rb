@@ -20,14 +20,10 @@ checker = CheckpasswordBCrypt::PasswordChecker.new
 begin
   checker.prepare!
 
-  unless checker.user?(username)
-    exit AuthError
-  end
+  exit AuthError unless checker.user?(username)
 
   if authorized != 1
-    unless checker.pass?(pass)
-      exit AuthError
-    end
+    exit AuthError unless checker.pass?(pass)
   end
 rescue CheckpasswordBCrypt::InternalError
   warn "authentication not possible, terminating..."

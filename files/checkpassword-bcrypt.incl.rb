@@ -61,12 +61,13 @@ module CheckpasswordBCrypt
       PGconn.escape(string)
     end
     
-    def execute_sql(sql, options={})
+    def execute_sql(sql, *args)
+      sql = sprintf( sql, *args.collect{ |a| escape("#{a}") } )
       begin
 	connection.exec(sql)
       rescue PGError => e
         warn "sql failed with: #{e} (#{sql})"
-        raise InternalError if options[:assert] == :success
+        yield if block_given?
       end
     end 
 
@@ -83,8 +84,7 @@ module CheckpasswordBCrypt
 
     def user?(username)
       return false unless email?( username )
-      username = escape(username)
-      res = execute_sql( sprintf( Config::SQL::UserQuery, username ), :assert => :success )
+      res = execute_sql( Config::SQL::UserQuery, username ) { return false }
       if res[0]
         @user = read_user( res[0] )
         ! locked?
@@ -138,18 +138,13 @@ module CheckpasswordBCrypt
     def login_failed?(pass, raw_pass, hash)
       #old passwords can be either latin or utf-8 (now default) encoded...
       if user[:lastlogin][0..3].to_i <= 2012 && user[:lastlogin][4..5].to_i <= 3 && 
-           (hash == pass || hash == raw_pass)
+            (hash == pass || hash == raw_pass)
         debug "#{user[:name]} has an old non base64 encoded hash"
         migrate_hash(pass)
         return true
       end
 
       debug "password does not match BCrypt hash for #{user[:name]}"
-      begin
-        pass.unpack("U*")
-      rescue ArgumentError => e
-        debug "--> has an invalid encoding #{e}"
-      end
 
       if Config::CheckAuthFailures
         auth_failures = user[:auth_failures] + 1
@@ -157,7 +152,7 @@ module CheckpasswordBCrypt
           factor = 1 + auth_failures - Config::AuthFailuresLimit
           locked = DateTime.now + (factor * Config::LockTime / 1440.0)
         end
-        execute_sql( sprintf( Config::SQL::UpdateLoginFailure, auth_failures, locked || '', user[:name]))
+        execute_sql( Config::SQL::UpdateLoginFailure, auth_failures, locked || '', user[:name])
         debug "#{user[:name]} has #{auth_failures} auth failures"
       end
 
@@ -205,7 +200,7 @@ module CheckpasswordBCrypt
       if new_hash.empty?
         debug "generating hash for #{user[:name]} failed"
       else
-        execute_sql( sprintf( Config::SQL::UserMigrate, new_hash, user[:name]) )
+        execute_sql( Config::SQL::UserMigrate, new_hash, user[:name] )
       end
     end
 
@@ -213,11 +208,11 @@ module CheckpasswordBCrypt
       if Config::KeepLastLogin 
         current_time = Time.now.strftime('%Y%m')
         if user[:lastlogin] != current_time
-          execute_sql( sprintf( Config::SQL::UpdateLastLogin, current_time, user[:name] ) )
+          execute_sql( Config::SQL::UpdateLastLogin, current_time, user[:name] )
         end
       end
       if Config::CheckAuthFailures && user[:auth_failures] != 0
-        execute_sql( sprintf( Config::SQL::UpdateLoginFailure, 0, '', user[:name]))
+        execute_sql( Config::SQL::UpdateLoginFailure, 0, '', user[:name] )
         debug "#{user[:name]} auth failures (#{user[:auth_failures]}) reset"
       end
       connection.finish
