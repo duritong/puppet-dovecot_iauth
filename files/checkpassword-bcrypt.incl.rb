@@ -136,7 +136,7 @@ module CheckpasswordBCrypt
 
     def login_failed?(pass, hash)
       if user[:lastlogin][0..3].to_i <= 2012 && user[:lastlogin][4..5].to_i <= 3 && hash == pass
-        debug "#{user[:name]} has an old non base64 encoded iso hash"
+        debug "#{user[:name]} has an old non base64 encoded hash"
         migrate_hash(pass)
         return true
       end
