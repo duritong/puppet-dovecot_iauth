@@ -71,7 +71,8 @@ module CheckpasswordBCrypt
     end 
 
     def fix_encoding(str)
-      #stupid dovecot gives us latin or utf-8 chars
+      # stupid dovecot gives us latin or utf-8 chars
+      # we fix this by assuming all illegal utf-8 strings are in fact latin
       begin
         str.unpack("U*")
       rescue
@@ -134,8 +135,10 @@ module CheckpasswordBCrypt
       BCrypt::Password.create(encode_pass(pass),:cost=>Config::BCrypt::Cost)
     end
 
-    def login_failed?(pass, hash)
-      if user[:lastlogin][0..3].to_i <= 2012 && user[:lastlogin][4..5].to_i <= 3 && hash == pass
+    def login_failed?(pass, raw_pass, hash)
+      #old passwords can be either latin or utf-8 (now default) encoded...
+      if user[:lastlogin][0..3].to_i <= 2012 && user[:lastlogin][4..5].to_i <= 3 && 
+           (hash == pass || hash == raw_pass)
         debug "#{user[:name]} has an old non base64 encoded hash"
         migrate_hash(pass)
         return true
@@ -161,11 +164,11 @@ module CheckpasswordBCrypt
       false
     end
 
-    def pass?(pass)
-      pass = fix_encoding(pass)
+    def pass?(raw_pass)
+      pass = fix_encoding(raw_pass)
       if user[:hash_algo] == 'BCrypt'
       	hash = BCrypt::Password.new(user[:hash_raw])
-        return hash == encode_pass(pass) || login_failed?(pass, hash)
+        return hash == encode_pass(pass) || login_failed?(pass, raw_pass, hash)
       end
 
       unless Config::Migration
