@@ -43,7 +43,7 @@ new_env = "USER='#{user[:name]}' "+
           "userdb_quota_rule='#{user[:quota]}' "+
           "userdb_uid='#{user[:uid]}' "+
           "userdb_gid='#{user[:gid]}' "+
-          (authorized == "1" ? "AUTHORIZED=2" : '')
+          (authorized == 1 ? "AUTHORIZED=2" : '')
 
 exec "#{new_env} #{dovecot}"
 
