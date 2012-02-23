@@ -135,6 +135,22 @@ module CheckpasswordBCrypt
       BCrypt::Password.create(encode_pass(pass),:cost=>Config::BCrypt::Cost)
     end
 
+    def lossy_hash(pass)
+      # this hash is constructed so it does not allow an attacker to recover the original password:
+      # only every second character is used and only a small part of the hash is returned.
+      # but this should be enough to allow us to distinguish frequent logins with the same 
+      # (but wrong) password from bruteforce attacks, where the password changes on every login.
+      s = []
+      i = 0
+      pass.each_char do |e|
+        s << e if i%2==0
+        i += 1
+      end
+      s << pass[-1]
+      s = s.sort.join('')
+      Base64.encode64(Digest::MD5::digest(s)[0..8]).chomp
+    end
+
     def login_failed?(pass, raw_pass, hash)
       #old passwords can be either latin or utf-8 (now default) encoded...
       if user[:lastlogin][0..3].to_i <= 2012 && user[:lastlogin][4..5].to_i <= 3 && 
@@ -153,7 +169,7 @@ module CheckpasswordBCrypt
           locked = DateTime.now + (factor * Config::LockTime / 1440.0)
         end
         execute_sql( Config::SQL::UpdateLoginFailure, auth_failures, locked || '', user[:name])
-        debug "#{user[:name]} has #{auth_failures} auth failures"
+        debug "#{user[:name]} has #{auth_failures} auth failures. pw hash: #{lossy_hash(pass)}"
       end
 
       false
