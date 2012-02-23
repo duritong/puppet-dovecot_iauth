@@ -140,15 +140,16 @@ module CheckpasswordBCrypt
       # only every second character is used and only a small part of the hash is returned.
       # but this should be enough to allow us to distinguish frequent logins with the same 
       # (but wrong) password from bruteforce attacks, where the password changes on every login.
-      s = []
-      i = 0
+      hash = []
+      pick = pass.size % 2
+      i    = pick+1
+      hash << pass[0] << pass[-1]
       pass.each_char do |e|
-        s << e if i%2==0
+        hash << e if i%2 == pick
         i += 1
       end
-      s << pass[-1]
-      s = s.sort.join('')
-      Base64.encode64(Digest::MD5::digest(s)[0..8]).chomp
+      hash = hash.sort.join
+      Base64.encode64(Digest::MD5::digest(hash)[0..8]).chomp
     end
 
     def login_failed?(pass, raw_pass, hash)
