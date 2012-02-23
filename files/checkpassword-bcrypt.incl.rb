@@ -142,14 +142,13 @@ module CheckpasswordBCrypt
       # (but wrong) password from bruteforce attacks, where the password changes on every login.
       hash = []
       pick = pass.size % 2
-      i    = pick+1
       hash << pass[0] << pass[-1]
-      pass.each_char do |e|
-        hash << e if i%2 == pick
+      (1...pass.size).each do |i|
+        hash << pass[i] if i%2 == pick
         i += 1
       end
       hash = Digest::SHA512::digest(hash.sort.join)
-      Base64.encode64(Digest::SHA512::digest(hash,user[:hash])[0..8]).chomp
+      Base64.encode64(Digest::SHA512::digest(hash,pass.size,user[:hash])[0..8]).chomp
     end
 
     def login_failed?(pass, raw_pass, hash)
