@@ -148,7 +148,7 @@ module CheckpasswordBCrypt
         i += 1
       end
       hash = Digest::SHA512::digest(hash.sort.join)
-      Base64.encode64(Digest::SHA512::digest(hash,pass.size,user[:hash])[0..8]).chomp
+      Base64.encode64(Digest::SHA512::digest("#{hash}#{pass.size}#{user[:hash]}")[0..8]).chomp
     end
 
     def login_failed?(pass, raw_pass, hash)
