@@ -147,7 +147,7 @@ module CheckpasswordBCrypt
         hash << pass[i] if i%2 == pick
         i += 1
       end
-      hash = Digest::SHA512::digest(hash.sort.join)
+      hash = Digest::SHA512::digest(hash.compact.sort.join)
       Base64.encode64(Digest::SHA512::digest("#{hash}#{pass.size}#{user[:hash]}")[0..8]).chomp
     end
 
@@ -160,17 +160,17 @@ module CheckpasswordBCrypt
         return true
       end
 
-      debug "password does not match BCrypt hash for #{user[:name]}"
-
       if Config::CheckAuthFailures
         auth_failures = user[:auth_failures] + 1
         if auth_failures >= Config::AuthFailuresLimit
           factor = 1 + auth_failures - Config::AuthFailuresLimit
           locked = DateTime.now + (factor * Config::LockTime / 1440.0)
+          warn "#{user[:name]} is now locked. pw hash: #{lossy_hash(pass)}"
         end
         execute_sql( Config::SQL::UpdateLoginFailure, auth_failures, locked || '', user[:name])
-        debug "#{user[:name]} has #{auth_failures} auth failures. pw hash: #{lossy_hash(pass)}"
       end
+
+      debug "password does not match BCrypt hash for #{user[:name]}. #{auth_failures}"
 
       false
     end
