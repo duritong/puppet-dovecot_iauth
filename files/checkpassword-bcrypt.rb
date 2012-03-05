@@ -31,7 +31,8 @@ rescue CheckpasswordBCrypt::InternalError
 end
 
 user = checker.user
-checker.login!
+# do not perform a full login if dovecot just does a userdb lookup
+checker.login! unless authorized == 1
 
 new_env = "USER='#{user[:name]}' "+
           "HOME='#{user[:home]}#{user[:name]}' "+
