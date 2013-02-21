@@ -64,7 +64,7 @@ module CheckpasswordBCrypt
     def execute_sql(sql, *args)
       sql = sprintf( sql, *args.collect{ |a| escape("#{a}") } )
       begin
-	connection.exec(sql)
+        connection.exec(sql)
       rescue PGError => e
         warn "sql failed with: #{e} (#{sql})"
         yield if block_given?
@@ -82,7 +82,7 @@ module CheckpasswordBCrypt
       str
     end 
 
-    def user?(username)
+    def user?(username, fail_on_lock = true)
       return false unless email?( username )
       res = execute_sql( Config::SQL::UserQuery, username ) { return false }
       if res[0]
@@ -231,7 +231,11 @@ module CheckpasswordBCrypt
         execute_sql( Config::SQL::UpdateLoginFailure, 0, '', user[:name] )
         debug "#{user[:name]} auth failures (#{user[:auth_failures]}) reset"
       end
+    end
+    def finish
       connection.finish
+    rescue PGError => e
+      debug "Error while finishing: #{e}"
     end
   end
 end

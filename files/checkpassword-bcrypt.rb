@@ -34,6 +34,9 @@ user = checker.user
 # do not perform a full login if dovecot just does a userdb lookup
 checker.login! unless authorized == 1
 
+# cleanup checker
+checker.finish
+
 new_env = "USER='#{user[:name]}' "+
           "HOME='#{user[:home]}#{user[:name]}' "+
           "EXTRA=\"userdb_uid userdb_gid userdb_quota_rule\" "+
