@@ -20,7 +20,8 @@ checker = CheckpasswordBCrypt::PasswordChecker.new
 begin
   checker.prepare!
 
-  exit AuthError unless checker.user?(username)
+  # we do not want to fail on if we're just doing a userdb lookup
+  exit AuthError unless checker.user?(username, (authorized != 1))
 
   if authorized != 1
     exit AuthError unless checker.pass?(pass)

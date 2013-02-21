@@ -82,12 +82,17 @@ module CheckpasswordBCrypt
       str
     end 
 
-    def user?(username, fail_on_lock = true)
+    def user?(username, fail_on_locked = true)
       return false unless email?( username )
       res = execute_sql( Config::SQL::UserQuery, username ) { return false }
       if res[0]
         @user = read_user( res[0] )
-        ! locked?
+        if fail_on_locked
+          ! locked?
+        else
+          debug "user is locked but we don't fail on that"
+          true
+        end
       else
         debug "user #{username} does not exist"
         false
