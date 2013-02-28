@@ -90,7 +90,7 @@ module CheckpasswordBCrypt
         if fail_on_locked
           ! locked?
         else
-          debug "user is locked but we don't fail on that"
+          debug "userdb lookup for locked user #{username}"
           true
         end
       else
