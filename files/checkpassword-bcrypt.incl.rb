@@ -6,6 +6,7 @@ require 'digest'
 require 'bcrypt'
 require 'base64'
 require 'iconv'
+require 'date'
 
 CONF_DIR = "/e/dovecot/bin/"
 
