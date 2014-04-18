@@ -61,7 +61,7 @@ module CheckpasswordBCrypt
     def escape(string)
       PGconn.escape(string)
     end
-    
+
     def execute_sql(sql, *args)
       sql = sprintf( sql, *args.collect{ |a| escape("#{a}") } )
       begin
@@ -70,7 +70,7 @@ module CheckpasswordBCrypt
         warn "sql failed with: #{e} (#{sql})"
         yield if block_given?
       end
-    end 
+    end
 
     def fix_encoding(str)
       # stupid dovecot gives us latin or utf-8 chars
@@ -81,7 +81,7 @@ module CheckpasswordBCrypt
         return Iconv.conv('utf-8', 'iso-8859-1', str)
       end
       str
-    end 
+    end
 
     def user?(username, fail_on_locked = true)
       return false unless email?( username )
@@ -135,7 +135,7 @@ module CheckpasswordBCrypt
     def encode_pass(pass)
       Base64.encode64(pass).chomp
     end
-    
+
     def bcrypt(pass)
       BCrypt::Password.create(encode_pass(pass),:cost=>Config::BCrypt::Cost)
     end
@@ -183,7 +183,7 @@ module CheckpasswordBCrypt
     def pass?(raw_pass)
       pass = fix_encoding(raw_pass)
       if user[:hash_algo] == 'BCrypt'
-      	hash = BCrypt::Password.new(user[:hash_raw])
+        hash = BCrypt::Password.new(user[:hash_raw])
         return hash == encode_pass(pass) || login_failed?(pass, raw_pass, hash)
       end
 
