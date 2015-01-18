@@ -167,12 +167,13 @@ module CheckpasswordBCrypt
 
       if Config::CheckAuthFailures
         auth_failures = user[:auth_failures] + 1
+        locked_until = nil
         if auth_failures >= Config::AuthFailuresLimit
           factor = 1 + auth_failures - Config::AuthFailuresLimit
-          locked = DateTime.now + (factor * Config::LockTime / 1440.0)
+          locked_until = DateTime.now + (factor * Config::LockTime / 1440.0)
           warn "#{user[:name]} is now locked. pw hash: #{lossy_hash(pass)}"
         end
-        execute_sql( Config::SQL::UpdateLoginFailure, auth_failures, locked || '', user[:name])
+        execute_sql( Config::SQL::UpdateLoginFailure, auth_failures, locked_until || '', user[:name])
       end
 
       debug "password does not match BCrypt hash for #{user[:name]}. #{auth_failures}"
