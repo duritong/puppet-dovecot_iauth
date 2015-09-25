@@ -1,14 +1,14 @@
 #!/usr/bin/env ruby
 
 require 'rubygems'
-require 'postgres'
+require 'pg'
 require 'digest'
 require 'bcrypt'
 require 'base64'
 require 'iconv'
 require 'date'
 
-CONF_DIR = "/e/dovecot/bin/"
+CONF_DIR = '/usr/libexec/dovecot/checkpassword-bcrypt'
 
 require File.join(CONF_DIR, "checkpassword-bcrypt.conf.rb")
 require File.join(CONF_DIR, "checkpassword-bcrypt.sql.conf.rb")
@@ -101,10 +101,10 @@ module CheckpasswordBCrypt
 
     def locked?
       return false unless Config::CheckAuthFailures
-      return false if "#{user[:locked]}".empty?
-      locked   = DateTime.parse(user[:locked])
+      return false if "#{user['locked']}".empty?
+      locked   = DateTime.parse(user['locked'])
       if DateTime.now < locked
-        warn "user #{user[:name]} is locked until #{locked}"
+        warn "user #{user['name']} is locked until #{locked}"
         true
       else
         false
@@ -112,21 +112,18 @@ module CheckpasswordBCrypt
     end
 
     def read_user( user_rec )
-      user = {}
-      (user[:name],user[:hash],user[:uid],
-       user[:quota],user[:lastlogin],
-       user[:auth_failures],user[:locked]) = user_rec
-      user[:auth_failures] = user[:auth_failures].to_i
-      user[:gid]  = Config::Mail::Gid
-      user[:home] = Config::Mail::Home
+      user = user_rec
+      user['auth_failures'] = user['auth_failures'].to_i
+      user['gid']  = Config::Mail::Gid
+      user['home'] = Config::Mail::Home
       read_hash( user )
     end
 
     def read_hash( user )
-      user[:hash] =~ /\{(.*)\}(.*)/
-      user[:hash_algo] = $1
-      user[:hash_raw] = $2
-      if user[:hash_algo] == nil then
+      user['hash'] =~ /\{(.*)\}(.*)/
+      user['hash_algo'] = $1
+      user['hash_raw'] = $2
+      if user['hash_algo'] == nil then
         Config::UnknownHashAlgo.call( user )
       end
       user
@@ -153,89 +150,89 @@ module CheckpasswordBCrypt
         i += 1
       end
       hash = Digest::SHA512::digest(hash.compact.sort.join)
-      Base64.encode64(Digest::SHA512::digest("#{hash}#{pass.size}#{user[:hash]}")[0..8]).chomp
+      Base64.encode64(Digest::SHA512::digest("#{hash}#{pass.size}#{user['hash']}")[0..8]).chomp
     end
 
     def login_failed?(pass, raw_pass, hash)
       #old passwords can be either latin or utf-8 (now default) encoded...
-      if user[:lastlogin][0..3].to_i <= 2012 && user[:lastlogin][4..5].to_i <= 3 && 
+      if user['lastlogin'][0..3].to_i <= 2012 && user['lastlogin'][4..5].to_i <= 3 && 
             (hash == pass || hash == raw_pass)
-        debug "#{user[:name]} has an old non base64 encoded hash"
+        debug "#{user['name']} has an old non base64 encoded hash"
         migrate_hash(pass)
         return true
       end
 
       if Config::CheckAuthFailures
-        auth_failures = user[:auth_failures] + 1
+        auth_failures = user['auth_failures'] + 1
         locked_until = nil
         if auth_failures >= Config::AuthFailuresLimit
           factor = 1 + auth_failures - Config::AuthFailuresLimit
           locked_until = DateTime.now + (factor * Config::LockTime / 1440.0)
-          warn "#{user[:name]} is now locked. pw hash: #{lossy_hash(pass)}"
+          warn "#{user['name']} is now locked. pw hash: #{lossy_hash(pass)}"
         end
-        execute_sql( Config::SQL::UpdateLoginFailure, auth_failures, locked_until || '', user[:name])
+        execute_sql( Config::SQL::UpdateLoginFailure, auth_failures, locked_until || '', user['name'])
       end
 
-      debug "password does not match BCrypt hash for #{user[:name]}. #{auth_failures}"
+      debug "password does not match BCrypt hash for #{user['name']}. #{auth_failures}"
 
       false
     end
 
     def pass?(raw_pass)
       pass = fix_encoding(raw_pass)
-      if user[:hash_algo] == 'BCrypt'
-        hash = BCrypt::Password.new(user[:hash_raw])
+      if user['hash_algo'] == 'BCrypt'
+        hash = BCrypt::Password.new(user['hash_raw'])
         return hash == encode_pass(pass) || login_failed?(pass, raw_pass, hash)
       end
 
       unless Config::Migration
-        warn "No bcrypt hash for user #{user[:name]} and migration disabled"
+        warn "No bcrypt hash for user #{user['name']} and migration disabled"
         raise InternalError
       end
 
       #this is an old hash which needs migration
-      if old_hash(pass) == user[:hash_raw]
+      if old_hash(pass) == user['hash_raw']
         migrate_hash(pass)
         true
       else
-        debug "password does not match legacy hash for #{user[:name]}"
+        debug "password does not match legacy hash for #{user['name']}"
         false
       end
     end
 
     def old_hash(pass)
-      case user[:hash_algo]
+      case user['hash_algo']
         when 'CRYPT'
-          salt = user[:hash_raw][0..1]
+          salt = user['hash_raw'][0..1]
           pass.crypt(salt)
         when 'MD5'
           Base64.encode64(Digest::MD5::digest(pass)).chomp
         else
-          warn "hash algo #{user[:hash_algo]} at user #{user[:name]} is not supported for migration"
+          warn "hash algo #{user['hash_algo']} at user #{user['name']} is not supported for migration"
           raise InternalError
       end
     end
 
     def migrate_hash(pass)
-      debug "migrating #{user[:name]} from #{user[:hash_algo]} to BCrypt"
+      debug "migrating #{user['name']} from #{user['hash_algo']} to BCrypt"
       new_hash    = bcrypt(pass)
       if new_hash.empty?
-        debug "generating hash for #{user[:name]} failed"
+        debug "generating hash for #{user['name']} failed"
       else
-        execute_sql( Config::SQL::UserMigrate, new_hash, user[:name] )
+        execute_sql( Config::SQL::UserMigrate, new_hash, user['name'] )
       end
     end
 
     def login!
       if Config::KeepLastLogin 
         current_time = Time.now.strftime('%Y%m')
-        if user[:lastlogin] != current_time
-          execute_sql( Config::SQL::UpdateLastLogin, current_time, user[:name] )
+        if user['lastlogin'] != current_time
+          execute_sql( Config::SQL::UpdateLastLogin, current_time, user['name'] )
         end
       end
-      if Config::CheckAuthFailures && user[:auth_failures] != 0
-        execute_sql( Config::SQL::UpdateLoginFailure, 0, '', user[:name] )
-        debug "#{user[:name]} auth failures (#{user[:auth_failures]}) reset"
+      if Config::CheckAuthFailures && user['auth_failures'] != 0
+        execute_sql( Config::SQL::UpdateLoginFailure, 0, '', user['name'] )
+        debug "#{user['name']} auth failures (#{user['auth_failures']}) reset"
       end
     end
     def finish

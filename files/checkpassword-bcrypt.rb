@@ -38,13 +38,12 @@ checker.login! unless authorized == 1
 # cleanup checker
 checker.finish
 
-new_env = "USER='#{user[:name]}' "+
-          "HOME='#{user[:home]}#{user[:name]}' "+
-          "EXTRA=\"userdb_uid userdb_gid userdb_quota_rule\" "+
-          "userdb_quota_rule='#{user[:quota]}' "+
-          "userdb_uid='#{user[:uid]}' "+
-          "userdb_gid='#{user[:gid]}' "+
-          (authorized == 1 ? "AUTHORIZED=2" : '')
-
-exec "#{new_env} #{dovecot}"
-
+ENV['USER']              = user['name']
+ENV['HOME']              = File.join(user['home'],user['name'])
+ENV['userdb_quota_rule'] = user['quota']
+ENV['userdb_uid']        = user['uid']
+ENV['userdb_gid']        = user['gid']
+ENV['EXTRA']             = 'userdb_uid userdb_gid userdb_quota_rule'
+ENV['AUTHORIZED']        = '2' if authorized == 1
+# keep FD 4 open as dovecot communicates on that one
+exec dovecot, { 4 => 4 }

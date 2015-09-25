@@ -1,11 +1,12 @@
 # module to manage dovecot iauth
 class dovecot_iauth {
-  include rubygems::bcrypt
+  ensure_packages(['rubygem-bcrypt','rubygem-pg','rubygem-iconv'])
 
   file{
     '/usr/libexec/dovecot/checkpassword-bcrypt' :
       ensure  => directory,
-      require => Package['dovecot'],
+      require => Package['dovecot','rubygem-bcrypt',
+        'rubygem-pg','rubygem-iconv'],
       owner   => root,
       group   => root,
       mode    => '0644';
@@ -20,6 +21,6 @@ class dovecot_iauth {
       before  => Service['dovecot'],
       owner   => root,
       group   => root,
-      mode    => '0755';
+      mode    => '0644';
   }
 }
