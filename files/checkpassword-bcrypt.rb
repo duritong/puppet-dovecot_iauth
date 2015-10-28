@@ -40,10 +40,17 @@ checker.finish
 
 ENV['USER']              = user['name']
 ENV['HOME']              = File.join(user['home'],user['name'])
-ENV['userdb_quota_rule'] = user['quota']
-ENV['userdb_uid']        = user['uid']
-ENV['userdb_gid']        = user['gid']
-ENV['EXTRA']             = 'userdb_uid userdb_gid userdb_quota_rule'
+extras = []
+CheckpasswordBCrypt::Config::Dovecot::ExtraUserDBFields.keys.each do |key|
+  script_key = "userdb_#{key}"
+  val = CheckpasswordBCrypt::Config::Dovecot::ExtraUserDBFields[key]
+  val = val.call(user) if val.is_a?(Proc)
+  if val && (!val.respond_to?(:empty?) || !val.empty?)
+    ENV[script_key] = val
+    extras << script_key
+  end
+end
+ENV['EXTRA']             = extras.join(' ')
 ENV['AUTHORIZED']        = '2' if authorized == 1
 # keep FD 4 open as dovecot communicates on that one
 exec dovecot, { 4 => 4 }
