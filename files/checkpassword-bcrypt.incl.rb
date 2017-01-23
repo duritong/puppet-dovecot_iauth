@@ -167,7 +167,8 @@ module CheckpasswordBCrypt
         locked_until = nil
         if auth_failures >= Config::AuthFailuresLimit
           factor = 1 + auth_failures - Config::AuthFailuresLimit
-          locked_until = DateTime.now + (factor * Config::LockTime / 1440.0)
+          locked_for = [factor * Config::LockTime, Config::MaxLockTime].min
+          locked_until = DateTime.now + locked_for / 1440.0
           warn "#{user['name']} is now locked. pw hash: #{lossy_hash(pass)}"
         end
         execute_sql( Config::SQL::UpdateLoginFailure, auth_failures, locked_until || '', user['name'])
