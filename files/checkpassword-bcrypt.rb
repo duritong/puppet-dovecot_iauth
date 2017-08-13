@@ -5,6 +5,7 @@ require File.join(File.dirname(__FILE__), "checkpassword-bcrypt.incl.rb")
 #if authorized is set to 1, dovecot does a userdb lookup. no login required.
 authorized = ENV['AUTHORIZED'].to_i
 dovecot = ARGV[0]
+ip = ENV['TCPREMOTEIP']
 
 begin
   input = IO.new(3,"r")
@@ -17,11 +18,17 @@ end
 
 checker = CheckpasswordBCrypt::PasswordChecker.new
 
+def trusted_ip ip
+  CheckpasswordBCrypt::Config::TrustedIps.include? ip
+end
+
 begin
   checker.prepare!
 
   # we do not want to fail on if we're just doing a userdb lookup
-  exit AuthError unless checker.user?(username, (authorized != 1))
+  fail_when_locked = (authorized != 1) && !trusted_ip(ip)
+
+  exit AuthError unless checker.user?(username, fail_when_locked)
 
   if authorized != 1
     exit AuthError unless checker.pass?(pass)
