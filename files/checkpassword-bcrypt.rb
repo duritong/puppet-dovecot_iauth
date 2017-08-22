@@ -21,7 +21,7 @@ def trusted_ip ip
 end
 
 trusted_login = trusted_ip(ip)
-if trusted_login && pass =~ /(.*)##untrusted_login/ then
+if trusted_login && pass =~ /(.*)##untrusted_login$/ then
   pass = $1
   trusted_login = false
 end
