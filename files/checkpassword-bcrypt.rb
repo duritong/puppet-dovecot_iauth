@@ -16,17 +16,23 @@ rescue
   exit InternalAuthError
 end
 
-checker = CheckpasswordBCrypt::PasswordChecker.new
-
 def trusted_ip ip
   CheckpasswordBCrypt::Config::TrustedIps.include? ip
 end
+
+trusted_login = trusted_ip(ip)
+if trusted_login && pass =~ /(.*)##untrusted_login/ then
+  pass = $1
+  trusted_login = false
+end
+
+checker = CheckpasswordBCrypt::PasswordChecker.new
 
 begin
   checker.prepare!
 
   # we do not want to fail on if we're just doing a userdb lookup
-  fail_when_locked = (authorized != 1) && !trusted_ip(ip)
+  fail_when_locked = (authorized != 1) && !trusted_login
 
   exit AuthError unless checker.user?(username, fail_when_locked)
 
