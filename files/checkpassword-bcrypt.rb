@@ -16,11 +16,11 @@ rescue
   exit InternalAuthError
 end
 
-def trusted_ip ip
-  CheckpasswordBCrypt::Config::TrustedIps.include? ip
+def trusted_ip?(ip)
+  CheckpasswordBCrypt::Config::TrustedIps.include?(ip)
 end
 
-trusted_login = trusted_ip(ip)
+trusted_login = trusted_ip?(ip)
 if trusted_login && pass =~ /(.*)##untrusted_login$/ then
   pass = $1
   trusted_login = false
