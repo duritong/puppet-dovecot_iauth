@@ -130,7 +130,7 @@ module CheckpasswordBCrypt
     end
 
     def encode_pass(pass)
-      Base64.encode64(pass).chomp
+      Base64.strict_encode64(pass)
     end
 
     def bcrypt(pass)
