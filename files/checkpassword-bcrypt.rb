@@ -57,12 +57,11 @@ ENV['HOME']              = File.join(user['home'],user['name'])
 extras = []
 extra_fields = is_userdb ? Checkpassword::Config::Dovecot::ExtraUserDBFields : Checkpassword::Config::Dovecot::ExtraPasswordDBFields
 extra_fields.keys.each do |key|
-  script_key = "userdb_#{key}"
   val = extra_fields[key]
   val = val.call(user) if val.is_a?(Proc)
   if val && (!val.respond_to?(:empty?) || !val.empty?)
-    ENV[script_key] = val
-    extras << script_key
+    ENV[key] = val
+    extras << key
   end
 end
 ENV['EXTRA']             = extras.join(' ')
