@@ -304,10 +304,12 @@ module Trees
     if (b.check_pw(pw))
       return b
     end
-    serialized_extra_boxes.split(",").each do |serialized_extra_box|
-      eb = KeyBox::deserialize(serialized_extra_box)
-      if (eb.check_pw(pw))
-        return eb
+    if serialized_extra_boxes && !serialized_extra_boxes.empty?
+      serialized_extra_boxes.split(",").each do |serialized_extra_box|
+        eb = KeyBox::deserialize(serialized_extra_box)
+        if (eb.check_pw(pw))
+          return eb
+        end
       end
     end
     false
