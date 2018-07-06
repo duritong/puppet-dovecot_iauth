@@ -16,7 +16,7 @@ require File.join(CONF_DIR, "checkpassword-bcrypt.sql.conf.rb")
 InternalAuthError = 111
 AuthError         = 1
 
-module CheckpasswordBCrypt
+module Checkpassword
 
   class InternalError < Exception
   end
@@ -26,7 +26,7 @@ module CheckpasswordBCrypt
     attr_reader :user, :connection
 
     def prepare!
-      begin 
+      begin
         @connection = PGconn.connect(
            Config::DB::Host, 5432, "","",
            Config::DB::Database,
@@ -116,7 +116,11 @@ module CheckpasswordBCrypt
       user['auth_failures'] = user['auth_failures'].to_i
       user['gid']  = Config::Mail::Gid
       user['home'] = Config::Mail::Home
-      read_hash( user )
+      if user['trees_public_key'].to_s.empty?
+        read_hash( user )
+      else
+        read_trees( user )
+      end
     end
 
     def read_hash( user )
@@ -126,6 +130,12 @@ module CheckpasswordBCrypt
       if user['hash_algo'] == nil then
         Config::UnknownHashAlgo.call( user )
       end
+      user
+    end
+
+    def read_trees( user )
+      user['trees_enabled'] = '1'
+      user['trees_version'] = '1'
       user
     end
 
@@ -181,23 +191,37 @@ module CheckpasswordBCrypt
 
     def pass?(raw_pass)
       pass = fix_encoding(raw_pass)
-      if user['hash_algo'] == 'BCrypt'
-        hash = BCrypt::Password.new(user['hash_raw'])
-        return hash == encode_pass(pass) || login_failed?(pass, raw_pass, hash)
-      end
-
-      unless Config::Migration
-        warn "No bcrypt hash for user #{user['name']} and migration disabled"
-        raise InternalError
-      end
-
-      #this is an old hash which needs migration
-      if old_hash(pass) == user['hash_raw']
-        migrate_hash(pass)
-        true
+      if user['trees_enabled'] == '1'
+        require '/usr/local/trees/trees.rb'
+        if box = Trees::authenticate(pass, user['trees_secret_box'], user['trees_extra_secret_boxes'])
+          user['trees_password'] = pass
+          user['trees_locked_secretbox'] = box.data
+          user['trees_sk_nonce'] = box.nonce
+          user['trees_pwhash_salt'] = box.salt
+          user['trees_pwhash_opslimit'] = box.opslimit
+          user['trees_pwhash_memlimit'] = box.memlimit
+        else
+          return false
+        end
       else
-        debug "password does not match legacy hash for #{user['name']}"
-        false
+        if user['hash_algo'] == 'BCrypt'
+          hash = BCrypt::Password.new(user['hash_raw'])
+          return hash == encode_pass(pass) || login_failed?(pass, raw_pass, hash)
+        end
+
+        unless Config::Migration
+          warn "No bcrypt hash for user #{user['name']} and migration disabled"
+          raise InternalError
+        end
+
+        #this is an old hash which needs migration
+        if old_hash(pass) == user['hash_raw']
+          migrate_hash(pass)
+          true
+        else
+          debug "password does not match legacy hash for #{user['name']}"
+          false
+        end
       end
     end
 

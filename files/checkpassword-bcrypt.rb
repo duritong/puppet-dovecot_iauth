@@ -4,6 +4,7 @@ require File.join(File.dirname(__FILE__), "checkpassword-bcrypt.incl.rb")
 
 #if authorized is set to 1, dovecot does a userdb lookup. no login required.
 authorized = ENV['AUTHORIZED'].to_i
+is_userdb = authorized == 1
 dovecot = ARGV[0]
 ip = ENV['TCPREMOTEIP']
 
@@ -17,7 +18,7 @@ rescue
 end
 
 def trusted_ip?(ip)
-  CheckpasswordBCrypt::Config::TrustedIps.include?(ip)
+  Checkpassword::Config::TrustedIps.include?(ip)
 end
 
 trusted_login = trusted_ip?(ip)
@@ -26,7 +27,7 @@ if trusted_login && pass =~ /(.*)##untrusted_login$/ then
   trusted_login = false
 end
 
-checker = CheckpasswordBCrypt::PasswordChecker.new
+checker = Checkpassword::PasswordChecker.new
 
 begin
   checker.prepare!
@@ -39,7 +40,7 @@ begin
   if authorized != 1
     exit AuthError unless checker.pass?(pass)
   end
-rescue CheckpasswordBCrypt::InternalError
+rescue Checkpassword::InternalError
   warn "authentication not possible, terminating..."
   exit InternalAuthError
 end
@@ -54,13 +55,13 @@ checker.finish
 ENV['USER']              = user['name']
 ENV['HOME']              = File.join(user['home'],user['name'])
 extras = []
-CheckpasswordBCrypt::Config::Dovecot::ExtraUserDBFields.keys.each do |key|
-  script_key = "userdb_#{key}"
-  val = CheckpasswordBCrypt::Config::Dovecot::ExtraUserDBFields[key]
+extra_fields = is_userdb ? Checkpassword::Config::Dovecot::ExtraUserDBFields : Checkpassword::Config::Dovecot::ExtraPasswordDBFields
+extra_fields.keys.each do |key|
+  val = extra_fields[key]
   val = val.call(user) if val.is_a?(Proc)
   if val && (!val.respond_to?(:empty?) || !val.empty?)
-    ENV[script_key] = val
-    extras << script_key
+    ENV[key] = val
+    extras << key
   end
 end
 ENV['EXTRA']             = extras.join(' ')

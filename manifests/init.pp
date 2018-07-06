@@ -2,7 +2,8 @@
 class dovecot_iauth {
   ensure_packages(['rubygem-bcrypt','rubygem-pg','rubygem-iconv'])
 
-  file{
+  class{'::dovecot_iauth::trees':
+  } -> file{
     '/usr/libexec/dovecot/checkpassword-bcrypt' :
       ensure  => directory,
       require => Package['dovecot','rubygem-bcrypt',
