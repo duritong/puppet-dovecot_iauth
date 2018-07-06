@@ -247,10 +247,10 @@ module Trees
       @data = data
       @nonce = nonce
       @salt = salt
-      @opslimit = Integer(opslimit)
-      @memlimit = Integer(memlimit)
+      @opslimit = opslimit
+      @memlimit = memlimit
       @box = Sodium::SecretBox.new(
-        from_hex(data), from_hex(nonce), from_hex(salt), @opslimit, @memlimit)
+        from_hex(data), from_hex(nonce), from_hex(salt), Integer(@opslimit), Integer(@memlimit))
     end
 
     def open_raw(pw)

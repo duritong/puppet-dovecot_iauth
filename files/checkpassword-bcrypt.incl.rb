@@ -200,6 +200,7 @@ module Checkpassword
           user['trees_pwhash_salt'] = box.salt
           user['trees_pwhash_opslimit'] = box.opslimit
           user['trees_pwhash_memlimit'] = box.memlimit
+          return true
         else
           return false
         end
