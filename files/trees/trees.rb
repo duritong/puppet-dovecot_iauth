@@ -66,8 +66,8 @@ module Sodium
   module PwHash
     ALG_ARGON2ID13   = Lib::crypto_pwhash_alg_argon2id13()
     ALG_ARGON2I13    = Lib::crypto_pwhash_alg_argon2i13()
-    DEFAULT_OPSLIMIT = Lib::crypto_pwhash_argon2id_opslimit_moderate()
-    DEFAULT_MEMLIMIT = Lib::crypto_pwhash_argon2id_memlimit_moderate()
+    DEFAULT_OPSLIMIT = Lib::crypto_pwhash_argon2id_opslimit_sensitive()
+    DEFAULT_MEMLIMIT = Lib::crypto_pwhash_argon2id_memlimit_interactive()
     HASH_SALT_BYTES  = Lib::crypto_pwhash_saltbytes()
     STR_HASH_BYTES   = Lib::crypto_pwhash_strbytes()
 
@@ -151,7 +151,8 @@ module Sodium
       @memlimit = memlimit
     end
 
-    def self.close(pw, data, opslimit, memlimit)
+    def self.close(pw, data, opslimit = PwHash::DEFAULT_OPSLIMIT,
+                   memlimit = PwHash::DEFAULT_MEMLIMIT)
       salt = Random::bytes(PwHash::HASH_SALT_BYTES)
       key = PwHash::kdf(pw, KEYBYTES, salt, opslimit, memlimit)
       box_bytes = MACBYTES + data.length
@@ -198,8 +199,8 @@ module Trees
 
   # creates a fresh public crypto keypair, stores it into a symmetric secretbox
   # and returns it in a format compatible with trees
-  def self.create(pw, opslimit = PwHash::DEFAULT_OPSLIMIT,
-                      memlimit = PwHash::DEFAULT_MEMLIMIT)
+  def self.create(pw, opslimit = Sodium::PwHash::DEFAULT_OPSLIMIT,
+                      memlimit = Sodium::PwHash::DEFAULT_MEMLIMIT)
     key = Sodium::Box::gen_keypair()
     box = Sodium::SecretBox::close(pw, key[:sec], opslimit, memlimit)
     [key[:pub], KeyBox::from_box(box)]
@@ -215,12 +216,14 @@ module Trees
 
   # takes a recovery token, the master secret and a new passwort, then creates a
   # new trees compatible secretbox with the new passwort
-  def self.recovery_open(recovery_box, recovery_issuer_pub, recovery_master_sec, new_pw)
+  def self.recovery_open(recovery_box, recovery_issuer_pub, recovery_master_sec,
+                         new_pw, opslimit = Sodium::PwHash::DEFAULT_OPSLIMIT,
+                         memlimit = Sodium::PwHash::DEFAULT_MEMLIMIT)
     recovery_box = recovery_box.unpack("m")[0]
     recover = Sodium::Box::open(recovery_issuer_pub, recovery_master_sec, recovery_box)
     sec     = recover[0...Sodium::Box::SEC_KEYBYTES]
     account = recover[Sodium::Box::SEC_KEYBYTES...recover.length].sub(0.chr,'')
-    new_box = Sodium::SecretBox::close(new_pw, sec)
+    new_box = Sodium::SecretBox::close(new_pw, sec, opslimit, memlimit)
     pub  = Sodium::Box::pubkey(sec)
     [account, pub, KeyBox::from_box(new_box)]
   end
