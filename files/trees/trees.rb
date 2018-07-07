@@ -211,7 +211,7 @@ module Trees
   def self.recovery(pw, box, account, recovery_master_pub, recovery_issuer_sec)
     secret = box.open_raw(pw)
     t = Sodium::Box::close(recovery_master_pub, recovery_issuer_sec, secret + account)
-    [t].pack("m").sub("\n","")
+    [t].pack("m").gsub("\n","")
   end
 
   # takes a recovery token, the master secret and a new passwort, then creates a
