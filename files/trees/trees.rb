@@ -13,66 +13,108 @@ end
 module Trees
   module Sodium
     require 'fiddle'
-    require 'fiddle/import'
 
     module Lib
-      extend Fiddle::Importer
+      # written agains libsodium 1.0.15
 
-      dlload '/usr/lib64/libsodium.so.23'
+      LIB_SODIUM = Fiddle.dlopen('/usr/lib64/libsodium.so.23')
+      def self.extern_(name, ret, args = [])
+        arg_names = (0...(args.size)).map{|a| "arg_#{a}"}.join(',')
+        fun_handle = "EXTERN_#{name.upcase}"
+        class_eval (
+          "#{fun_handle} = Fiddle::Function.new(LIB_SODIUM['#{name}'], #{args}, #{ret})
+           def self.#{name} (#{arg_names})
+             #{fun_handle}.call(#{arg_names})
+           end")
+      end
 
-      extern 'int sodium_init()'
+      INT       = Fiddle::TYPE_INT
+      CHARP     = Fiddle::TYPE_VOIDP
+      VOID      = Fiddle::TYPE_VOID
+      LONG_LONG = Fiddle::TYPE_LONG_LONG
+      SIZE_T    = Fiddle::TYPE_SIZE_T
+
+
+      # int sodium_init()
+      extern_ 'sodium_init', INT
+
 
       # pwhash
-      extern 'int crypto_pwhash(unsigned char * const out, unsigned long long outlen,
-                    const char * const passwd, unsigned long long passwdlen,
-                    const unsigned char * const salt,
-                    unsigned long long opslimit, size_t memlimit, int alg)'
+
+      # int crypto_pwhash(unsigned char * const out, unsigned long long outlen,
+      #        const char * const passwd, unsigned long long passwdlen,
+      #        const unsigned char * const salt,
+      #        unsigned long long opslimit, size_t memlimit, int alg)'
+      extern_ 'crypto_pwhash', INT,
+        [CHARP, LONG_LONG, CHARP, LONG_LONG, CHARP, LONG_LONG, SIZE_T, INT]
+
 
       # box
-      extern 'int crypto_box_keypair(unsigned char *pk, unsigned char *sk)'
-      extern 'int crypto_box_easy(unsigned char *c, const unsigned char *m,
-                      unsigned long long mlen, const unsigned char *n,
-                      const unsigned char *pk, const unsigned char *sk)'
-      extern 'int crypto_box_open_easy(unsigned char *m, const unsigned char *c,
-                           unsigned long long clen, const unsigned char *n,
-                           const unsigned char *pk, const unsigned char *sk)'
+
+      # int crypto_box_keypair(unsigned char *pk, unsigned char *sk)
+      extern_ 'crypto_box_keypair', INT, [CHARP, CHARP]
+
+      # int crypto_box_easy(unsigned char *c, const unsigned char *m,
+      #      unsigned long long mlen, const unsigned char *n,
+      #      const unsigned char *pk, const unsigned char *sk)'
+      extern_ 'crypto_box_easy', INT,
+        [CHARP, CHARP, LONG_LONG, CHARP, CHARP, CHARP]
+
+      # int crypto_box_open_easy(unsigned char *m, const unsigned char *c,
+      #      unsigned long long clen, const unsigned char *n,
+      #      const unsigned char *pk, const unsigned char *sk)'
+      extern_ 'crypto_box_open_easy', INT,
+        [CHARP, CHARP, LONG_LONG, CHARP, CHARP, CHARP]
+
 
       # scalarmult
-      extern 'int crypto_scalarmult_base(unsigned char *q, const unsigned char *n)'
+
+      # int crypto_scalarmult_base(unsigned char *q, const unsigned char *n)
+      extern_ 'crypto_scalarmult_base', INT, [CHARP, CHARP]
+
 
       # randombytes
-      extern 'void randombytes_buf(const void * buf, size_t size)'
+
+      # void randombytes_buf(const void * buf, size_t size)
+      extern_ 'randombytes_buf', VOID, [CHARP, SIZE_T]
+
 
       # secretbox
-      extern 'int crypto_secretbox_easy(unsigned char *c, const unsigned char *m,
-                            unsigned long long mlen, const unsigned char *n,
-                            const unsigned char *k)'
-      extern 'int crypto_secretbox_open_easy(unsigned char *m, const unsigned char *c,
-                                 unsigned long long clen, const unsigned char *n,
-                                 const unsigned char *k)'
+
+      # int crypto_secretbox_easy(unsigned char *c, const unsigned char *m,
+      #         unsigned long long mlen, const unsigned char *n,
+      #         const unsigned char *k)'
+      extern_ 'crypto_secretbox_easy', INT,
+        [CHARP, CHARP, LONG_LONG, CHARP, CHARP]
+
+      # int crypto_secretbox_open_easy(unsigned char *m, const unsigned char *c,
+      #         unsigned long long clen, const unsigned char *n,
+      #         const unsigned char *k)'
+      extern_ 'crypto_secretbox_open_easy', INT,
+        [CHARP, CHARP, LONG_LONG, CHARP, CHARP]
 
       # consts
-      extern 'int crypto_pwhash_alg_argon2i13()'
-      extern 'int crypto_pwhash_alg_argon2id13()'
+      extern_ 'crypto_pwhash_alg_argon2i13', INT
+      extern_ 'crypto_pwhash_alg_argon2id13', INT
 
-      extern 'size_t crypto_pwhash_saltbytes()'
-      extern 'size_t crypto_pwhash_strbytes()'
+      extern_ 'crypto_pwhash_saltbytes', SIZE_T
+      extern_ 'crypto_pwhash_strbytes', SIZE_T
 
-      extern 'size_t crypto_pwhash_opslimit_interactive()'
-      extern 'size_t crypto_pwhash_memlimit_interactive()'
-      extern 'size_t crypto_pwhash_opslimit_moderate()'
-      extern 'size_t crypto_pwhash_memlimit_moderate()'
-      extern 'size_t crypto_pwhash_opslimit_sensitive()'
-      extern 'size_t crypto_pwhash_memlimit_sensitive()'
+      extern_ 'crypto_pwhash_opslimit_interactive', SIZE_T
+      extern_ 'crypto_pwhash_memlimit_interactive', SIZE_T
+      extern_ 'crypto_pwhash_opslimit_moderate', SIZE_T
+      extern_ 'crypto_pwhash_memlimit_moderate', SIZE_T
+      extern_ 'crypto_pwhash_opslimit_sensitive', SIZE_T
+      extern_ 'crypto_pwhash_memlimit_sensitive', SIZE_T
 
-      extern 'size_t crypto_box_publickeybytes()'
-      extern 'size_t crypto_box_secretkeybytes()'
-      extern 'size_t crypto_box_macbytes()'
-      extern 'size_t crypto_box_noncebytes()'
+      extern_ 'crypto_box_publickeybytes', SIZE_T
+      extern_ 'crypto_box_secretkeybytes', SIZE_T
+      extern_ 'crypto_box_macbytes', SIZE_T
+      extern_ 'crypto_box_noncebytes', SIZE_T
 
-      extern 'size_t crypto_secretbox_keybytes()'
-      extern 'size_t crypto_secretbox_macbytes()'
-      extern 'size_t crypto_secretbox_noncebytes()'
+      extern_ 'crypto_secretbox_keybytes', SIZE_T
+      extern_ 'crypto_secretbox_macbytes', SIZE_T
+      extern_ 'crypto_secretbox_noncebytes', SIZE_T
     end
 
     Lib::sodium_init() == 0 or throw :init_err
