@@ -151,10 +151,8 @@ module Sodium
       @memlimit = memlimit
     end
 
-    def self.close(pw, data)
+    def self.close(pw, data, opslimit, memlimit)
       salt = Random::bytes(PwHash::HASH_SALT_BYTES)
-      opslimit = PwHash::DEFAULT_OPSLIMIT
-      memlimit = PwHash::DEFAULT_MEMLIMIT
       key = PwHash::kdf(pw, KEYBYTES, salt, opslimit, memlimit)
       box_bytes = MACBYTES + data.length
       buf = FFI::MemoryPointer.new(:uchar, box_bytes)
@@ -200,9 +198,10 @@ module Trees
 
   # creates a fresh public crypto keypair, stores it into a symmetric secretbox
   # and returns it in a format compatible with trees
-  def self.create(pw)
+  def self.create(pw, opslimit = PwHash::DEFAULT_OPSLIMIT,
+                      memlimit = PwHash::DEFAULT_MEMLIMIT)
     key = Sodium::Box::gen_keypair()
-    box = Sodium::SecretBox::close(pw, key[:sec])
+    box = Sodium::SecretBox::close(pw, key[:sec], opslimit, memlimit)
     [key[:pub], KeyBox::from_box(box)]
   end
 
