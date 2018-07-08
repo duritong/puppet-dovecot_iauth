@@ -347,6 +347,7 @@ module Trees
     [key[0], KeyBox::from_box(box)]
   end
 
+  # changes the password
   def self.passwd(pw, new_pw, serialized_box,
                   opslimit = DEFAULT_PWHASH_OPSLIMIT,
                   memlimit = DEFAULT_PWHASH_MEMLIMIT)
