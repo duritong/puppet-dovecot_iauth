@@ -1,3 +1,5 @@
+require 'yaml'
+
 def to_hex(v)
   "#{v.unpack('H*')[0]}"
 end
@@ -190,7 +192,8 @@ module Trees
 
       def self.close(pw, data, opslimit, memlimit)
         salt = Random::bytes(PwHash::SALTBYTES)
-        key = PwHash::kdf(pw, KEYBYTES, salt, opslimit, memlimit)
+        key = PwHash::kdf(pw, KEYBYTES, salt,
+                          Integer(opslimit), Integer(memlimit))
         box_bytes = MACBYTES + data.length
         buf = char_array(box_bytes)
         nonce = Random::bytes(NONCEBYTES)
@@ -258,10 +261,6 @@ module Trees
         Integer(@opslimit), Integer(@memlimit))
     end
 
-    def raw_data
-      box.data
-    end
-
     def open_raw(pw)
       @box.open(pw, Sodium::Box::SEC_KEYBYTES)
     end
@@ -280,9 +279,9 @@ module Trees
     end
 
     def serialize
-      raise :wrong_payload_len unless data.length == DATA_LEN
-      raise :wrong_nonce_len unless nonce.length == NONCE_LEN
-      raise :wrong_salt_len unless salt.length == SALT_LEN
+      throw :wrong_payload_len unless data.length == DATA_LEN
+      throw :wrong_nonce_len unless nonce.length == NONCE_LEN
+      throw :wrong_salt_len unless salt.length == SALT_LEN
       "#{data}:#{nonce}:#{salt}:#{opslimit}:#{memlimit}"
     end
 
@@ -299,7 +298,7 @@ module Trees
       pos += SALT_LEN+1
       rest = str[pos..-1]
       (opslimit, memlimit) = rest.split(':')
-      KeyBox.new(data, nonce, salt, opslimit, memlimit)
+      KeyBox.new(data, nonce, salt, opslimit, memlimit.rstrip)
     end
 
     def self.from_box(box)
@@ -361,16 +360,6 @@ module Trees
     KeyBox::from_box(new_box)
   end
 
-  # create a temp password
-  def self.duplicate_box(box)
-    temp_pw = Sodium::Random::bytes(64)
-    temp_pw = [temp_pw].pack("m").gsub("\n","")
-    new_box = Sodium::SecretBox::close(
-      temp_pw, box.raw_data, box.opslimit, box.memlimit)
-    [temp_pw, KeyBox::from_box(new_box)]
-  end
-
-
   # unlocks the trees compatible secretbox and creates a recovery token for
   # the secret key that is in it
   def self.recovery(pw, box, account, keyring)
@@ -390,6 +379,13 @@ module Trees
     end
   end
 
+  def self.parse_extra_boxes(serialized_extra_boxes)
+    (begin
+       YAML.load(serialized_extra_boxes || "")
+     ensure
+     end) || {}
+  end
+
   # takes a recovery token, the master secret and a new passwort, then creates a
   # new trees compatible secretbox with the new passwort
   def self.recovery_open(recovery_box, keyring, new_pw,
@@ -403,16 +399,60 @@ module Trees
     [account, pub, KeyBox::from_box(new_box)]
   end
 
+  # create an app password
+  def self.add_app_password(box, pw, name, serialized_extra_boxes, expire = nil)
+    extra_boxes = parse_extra_boxes(serialized_extra_boxes)
+    temp_pw = Sodium::Random::bytes(64)
+    temp_pw = [temp_pw].pack("m").gsub("\n","")
+    new_box = Sodium::SecretBox::close(
+      temp_pw, box.open_raw(pw), box.opslimit, box.memlimit)
+    new_serialized_box = {box: KeyBox::from_box(new_box).serialize}
+    if expire
+      new_serialized_box[:expire] = expire
+    end
+    new_extra_boxes = extra_boxes.merge({name => new_serialized_box})
+    [temp_pw, new_extra_boxes.to_yaml]
+  end
+
+  def self.contains_app_password(serialized_extra_boxes, name)
+    extra_boxes = parse_extra_boxes(serialized_extra_boxes)
+    !!extra_boxes[name]
+  end
+
+  def self.remove_app_password(serialized_extra_boxes, name)
+    extra_boxes = parse_extra_boxes(serialized_extra_boxes)
+    extra_boxes.delete(name)
+    extra_boxes.to_yaml
+  end
+
+  def self.expunge_app_password(serialized_extra_boxes)
+    extra_boxes = parse_extra_boxes(serialized_extra_boxes)
+    extra_boxes.keys.each do |name|
+      if extra_boxes[name][:expire] && extra_box[:expire] <= DateTime.now
+        extra_boxes.delete(name)
+      end
+    end
+    extra_boxes.to_yaml
+  end
+
+  def self.list_app_password_names(serialized_extra_boxes)
+    extra_boxes = parse_extra_boxes(serialized_extra_boxes)
+    extra_boxes.map{|b,_| b}
+  end
+
   def self.authenticate(pw, serialized_box, serialized_extra_boxes)
     b = KeyBox::deserialize(serialized_box)
     if (b.check_pw(pw))
       return b
     end
     if serialized_extra_boxes && !serialized_extra_boxes.empty?
-      serialized_extra_boxes.split(",").each do |serialized_extra_box|
-        eb = KeyBox::deserialize(serialized_extra_box)
-        if (eb.check_pw(pw))
-          return eb
+      extra_boxes = parse_extra_boxes(serialized_extra_boxes)
+      extra_boxes.each do |_, extra_box|
+        if !extra_box[:expire] || extra_box[:expire] > DateTime.now
+          eb = KeyBox::deserialize(extra_box[:box])
+          if (eb.check_pw(pw))
+            return eb
+          end
         end
       end
     end
