@@ -258,6 +258,10 @@ module Trees
         Integer(@opslimit), Integer(@memlimit))
     end
 
+    def raw_data
+      box.data
+    end
+
     def open_raw(pw)
       @box.open(pw, Sodium::Box::SEC_KEYBYTES)
     end
@@ -356,6 +360,16 @@ module Trees
     new_box = Sodium::SecretBox::close(new_pw, key, opslimit, memlimit)
     KeyBox::from_box(new_box)
   end
+
+  # create a temp password
+  def self.duplicate_box(box)
+    temp_pw = Sodium::Random::bytes(64)
+    temp_pw = [temp_pw].pack("m").gsub("\n","")
+    new_box = Sodium::SecretBox::close(
+      temp_pw, box.raw_data, box.opslimit, box.memlimit)
+    [temp_pw, KeyBox::from_box(new_box)]
+  end
+
 
   # unlocks the trees compatible secretbox and creates a recovery token for
   # the secret key that is in it
