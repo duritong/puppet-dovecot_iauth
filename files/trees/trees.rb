@@ -50,6 +50,19 @@ module Trees
       extern_ 'crypto_pwhash', INT,
         [CHARP, LONG_LONG, CHARP, LONG_LONG, CHARP, LONG_LONG, SIZE_T, INT]
 
+      # int crypto_pwhash_str(char out[crypto_pwhash_STRBYTES],
+      #                 const char * const passwd,
+      #                 unsigned long long passwdlen,
+      #                 unsigned long long opslimit,
+      #                 size_t memlimit);
+      extern_ 'crypto_pwhash_str', INT,
+        [CHARP, CHARP, LONG_LONG, LONG_LONG, SIZE_T]
+
+      # int crypto_pwhash_str_verify(const char str[crypto_pwhash_STRBYTES],
+      #                        const char * const passwd,
+      #                        unsigned long long passwdlen);
+      extern_ 'crypto_pwhash_str_verify', INT,
+        [CHARP, CHARP, LONG_LONG]
 
       # box
 
@@ -128,9 +141,22 @@ module Trees
 
       def self.kdf(pw, len, salt, opslimit, memlimit, algo = ALG_ARGON2ID13)
         buf = char_array(len)
-        r = Lib::crypto_pwhash(buf, len, pw, pw.length, salt, opslimit, memlimit, algo)
+        r = Lib::crypto_pwhash(buf, len, pw, pw.bytesize, salt, opslimit, memlimit, algo)
         throw :hash_key_err unless r == 0
         buf.to_str
+      end
+
+      def self.hash(pw,
+                    opslimit = Lib::crypto_pwhash_opslimit_sensitive(),
+                    memlimit = Lib::crypto_pwhash_memlimit_moderate())
+        buf = char_array(Lib::crypto_pwhash_strbytes())
+        r = Lib::crypto_pwhash_str(buf, pw, pw.bytesize, opslimit, memlimit)
+        throw :hash_key_err unless r == 0
+        buf.to_str.rstrip
+      end
+
+      def self.check_hash(pw, hash)
+        Lib::crypto_pwhash_str_verify(hash, pw, pw.bytesize) == 0
       end
     end
 
@@ -156,10 +182,10 @@ module Trees
       end
 
       def self.close(pub, sec, data)
-        bytes = data.length + MACBYTES
+        bytes = data.bytesize + MACBYTES
         buf = char_array(bytes)
         nonce = Random::bytes(NONCEBYTES)
-        r = Lib::crypto_box_easy(buf, data, data.length, nonce, pub, sec)
+        r = Lib::crypto_box_easy(buf, data, data.bytesize, nonce, pub, sec)
         throw :box_close_err unless r == 0
         nonce + buf.to_str
       end
@@ -167,9 +193,9 @@ module Trees
       def self.open(pub, sec, data, plain_length = nil)
         nonce = data[0...NONCEBYTES]
         data = data[NONCEBYTES...data.length]
-        plain_length ||= data.length - MACBYTES
+        plain_length ||= data.bytesize - MACBYTES
         buf = char_array(plain_length)
-        r = Lib::crypto_box_open_easy(buf, data, data.length, nonce, pub, sec)
+        r = Lib::crypto_box_open_easy(buf, data, data.bytesize, nonce, pub, sec)
         throw :box_open_err unless r == 0
         buf.to_str(plain_length)
       end
@@ -194,10 +220,10 @@ module Trees
         salt = Random::bytes(PwHash::SALTBYTES)
         key = PwHash::kdf(pw, KEYBYTES, salt,
                           Integer(opslimit), Integer(memlimit))
-        box_bytes = MACBYTES + data.length
+        box_bytes = MACBYTES + data.bytesize
         buf = char_array(box_bytes)
         nonce = Random::bytes(NONCEBYTES)
-        r = Lib::crypto_secretbox_easy(buf, data, data.length, nonce, key)
+        r = Lib::crypto_secretbox_easy(buf, data, data.bytesize, nonce, key)
         throw :secretbox_close_err unless r == 0
         SecretBox.new(
           buf.to_str,
@@ -213,8 +239,8 @@ module Trees
           throw :wrong_size
         end
         key = PwHash::kdf(pw, KEYBYTES, salt, opslimit, memlimit)
-        buf = char_array(data.length)
-        r = Lib::crypto_secretbox_open_easy(buf, data, data.length, nonce, key)
+        buf = char_array(data.bytesize)
+        r = Lib::crypto_secretbox_open_easy(buf, data, data.bytesize, nonce, key)
         throw :secretbox_open_err unless r == 0
         buf.to_str(plain_size)
       end
@@ -226,11 +252,16 @@ module Trees
         Lib::randombytes_buf(buf, l)
         buf.to_str
       end
+
+      def self.ascii(l)
+        t = Sodium::Random::bytes(l)
+        [t].pack("m").gsub("\n","")[0..l]
+      end
     end
   end
 
-  DEFAULT_PWHASH_OPSLIMIT = Sodium::Lib::crypto_pwhash_opslimit_sensitive
-  DEFAULT_PWHASH_MEMLIMIT = Sodium::Lib::crypto_pwhash_memlimit_interactive
+  DEFAULT_PWHASH_OPSLIMIT = Sodium::Lib::crypto_pwhash_opslimit_sensitive()
+  DEFAULT_PWHASH_MEMLIMIT = Sodium::Lib::crypto_pwhash_memlimit_interactive()
 
   # This class provides the glue code between a generic sodium secretbox
   # and a secret box with all metadata and serialization format that we
@@ -279,9 +310,9 @@ module Trees
     end
 
     def serialize
-      throw :wrong_payload_len unless data.length == DATA_LEN
-      throw :wrong_nonce_len unless nonce.length == NONCE_LEN
-      throw :wrong_salt_len unless salt.length == SALT_LEN
+      throw :wrong_payload_len unless data.bytesize == DATA_LEN
+      throw :wrong_nonce_len unless  nonce.bytesize == NONCE_LEN
+      throw :wrong_salt_len unless    salt.bytesize == SALT_LEN
       "#{data}:#{nonce}:#{salt}:#{opslimit}:#{memlimit}"
     end
 
@@ -393,7 +424,7 @@ module Trees
                          memlimit = DEFAULT_PWHASH_MEMLIMIT)
     recover = recovery_try_open(recovery_box, keyring)
     sec     = recover[0...Sodium::Box::SEC_KEYBYTES]
-    account = recover[Sodium::Box::SEC_KEYBYTES...recover.length].sub(0.chr,'')
+    account = recover[Sodium::Box::SEC_KEYBYTES...recover.bytesize].sub(0.chr,'')
     new_box = Sodium::SecretBox::close(new_pw, sec, opslimit, memlimit)
     pub  = Sodium::Box::pubkey(sec)
     [account, pub, KeyBox::from_box(new_box)]
@@ -402,8 +433,7 @@ module Trees
   # create an app password
   def self.add_app_password(box, pw, name, serialized_extra_boxes, expire = nil)
     extra_boxes = parse_extra_boxes(serialized_extra_boxes)
-    temp_pw = Sodium::Random::bytes(64)
-    temp_pw = [temp_pw].pack("m").gsub("\n","")
+    temp_pw = Sodium::Random::ascii(24)
     new_box = Sodium::SecretBox::close(
       temp_pw, box.open_raw(pw), box.opslimit, box.memlimit)
     new_serialized_box = {box: KeyBox::from_box(new_box).serialize}
