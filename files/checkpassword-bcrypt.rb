@@ -32,7 +32,7 @@ def auth(user, userdb, pass, ip, untrusted_client)
     end
 
     begin
-      response = res.post(query.to_json)
+      response = res.post(query.to_json, content_type: :json)
     rescue RestClient::BadRequest => e
       err = JSON.parse(e.response)
       if err['errors'] == 'auth_fail'
