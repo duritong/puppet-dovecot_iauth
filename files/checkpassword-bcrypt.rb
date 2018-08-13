@@ -41,18 +41,18 @@ def auth(user, userdb, pass, ip, untrusted_client)
       else
         warn "IAPI: Got unexpected rest error #{e}"
         ENV['HOME'] = oldhome
-        exit false
+        return false
       end
     rescue => e
       warn "IAPI: Got unexpected error #{e}"
       ENV['HOME'] = oldhome
-      exit false
+      return false
     end
     res = JSON.parse(response)
     ENV['HOME'] = oldhome
     if !res || res['result'] != "success"
       warn "IAPI: Got unexpected response #{res}"
-      exit false
+      return false
     end
     res['login']
   end
